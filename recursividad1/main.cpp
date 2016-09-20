@@ -27,6 +27,26 @@ enum
     rec_not,
     rec_parant,
 };
+enum
+{
+    STATE_2OP_NONE,
+    STATE_2OP_LVAL,
+    STATE_2OP_OPERATOR,
+    STATE_2OP_RVAL,
+};
+uint8_t  logical(uint8_t lval, uint8_t op, uint8_t rval)
+{
+    uint8_t r=0;
+
+    if (op == '&')
+        r = lval && rval;
+    else if (op == '|')
+        r = lval || rval;
+
+    return r;
+}
+
+
 //char exp[20]= {'n','n','n','n','n','n','n','n',1, eof};
 //unsigned
 //char exp[20]= {'n',1, eof};
@@ -37,15 +57,21 @@ enum
 //char exp[20]= {'n','(','(', 'n', 1,')',')', eof};
 //char exp[20]= {'n','(','(', 'n','n',1,')',')', eof};
 //char exp[20]= {'(','n','(','(','(', 'n','(', 'n',1,')',')',')',')',')', eof};
-char exp[20]= {'(','n',1,')', eof};
+//char exp[20]= {'(','n',1,')', eof};
+
+char exp[20]= {1,'&',0, eof};
 uint8_t fr(char *p, uint8_t *counter, uint8_t rec)
 {
-    uint8_t state = 0;
+    char el;
     uint8_t cycle = CYCLE_NONE;
-    uint8_t lval, rval;
+    uint8_t lval, _lval;
     uint8_t counter_rec=0;
     uint8_t rcsvd = 0;
-    char el;
+
+    uint8_t state_NOT = 0;
+    uint8_t state_2OP = 0;
+    uint8_t rval;
+    uint8_t op;
 
     while (*p != eof)
     {
@@ -56,13 +82,13 @@ uint8_t fr(char *p, uint8_t *counter, uint8_t rec)
             if (cycle == CYCLE_NONE)
             {
                 cycle = CYCLE_NOT;
-                 state = NOT_BEGIN;
+                state_NOT = NOT_BEGIN;
             }
             else
             {
                 rcsvd = 1;
                 lval = fr(p, &counter_rec, rec_not);
-                state = NOT_TO_END;
+                state_NOT = NOT_TO_END;
             }
         }
         else if (el == '(')
@@ -72,16 +98,24 @@ uint8_t fr(char *p, uint8_t *counter, uint8_t rec)
             p++;
             (*counter)++;
 
-            lval = fr(p, &counter_rec, rec_parant);//regresa despues de haber )
+            _lval = fr(p, &counter_rec, rec_parant);//regresa despues de haber )
 
-            if (cycle == CYCLE_NOT)
+            if (cycle == CYCLE_NONE)
             {
-                //lval = _lval;
-                state = NOT_TO_END;
+                lval = _lval;
+            }
+            else if (cycle == CYCLE_NOT)
+            {
+                lval = _lval;
+                state_NOT = NOT_TO_END;
             }
             else if (cycle == CYCLE_2OP)
             {
-
+                if (state_2OP == STATE_2OP_OPERATOR)
+                {
+                    rval = lval;
+                    state_2OP = STATE_2OP_RVAL;
+                }
             }
         }
         else if (el == ')')
@@ -91,7 +125,14 @@ uint8_t fr(char *p, uint8_t *counter, uint8_t rec)
         }
         else if ((el=='&') || (el=='|'))
         {
-
+            if (cycle == CYCLE_2OP)
+            {
+                if (state_2OP == STATE_2OP_LVAL)
+                {
+                    op = el;
+                    state_2OP = STATE_2OP_OPERATOR;
+                }
+            }
         }
         else //operandos
         {
@@ -99,25 +140,49 @@ uint8_t fr(char *p, uint8_t *counter, uint8_t rec)
             {
                 cycle = CYCLE_2OP;
 
+                if (state_2OP == STATE_2OP_NONE)
+                {
+                    lval = el;
+                    state_2OP = STATE_2OP_LVAL;
+                }
             }
             else if (cycle == CYCLE_NOT)
             {
                 lval = el;
-                state = NOT_TO_END;
+                state_NOT = NOT_TO_END;
+            }
+            else if (cycle == CYCLE_2OP)
+            {
+                if (state_2OP == STATE_2OP_OPERATOR)
+                {
+                    rval = el;
+                    state_2OP = STATE_2OP_RVAL;
+                }
             }
         }
         //////////////////////////////////////
         if (rcsvd == 0)
             (*counter)++;
 
+        ///////////////////////////////////////
+        if (cycle == CYCLE_2OP)
+        {
+            if (state_2OP == STATE_2OP_RVAL)
+            {
+                //ready to operate
+                lval = logical(lval, op, rval);
+            }
+        }
+        ///////////////////////////////////////
+
         //////////////////////////////////////
         if (cycle == CYCLE_NOT)
         {
-            if (state == NOT_TO_END)
+            if (state_NOT == NOT_TO_END)
             {
                 lval = !lval;
 
-                state = NOT_END;
+                state_NOT = NOT_END;
             }
         }
 
@@ -135,9 +200,9 @@ uint8_t fr(char *p, uint8_t *counter, uint8_t rec)
 
         if (rec > rec_none)
         {
-            if ((cycle == CYCLE_NOT) && (state == NOT_END))
+            if ((cycle == CYCLE_NOT) && (state_NOT == NOT_END))
             {
-                state = 0;
+                state_NOT = 0;
                 cycle = CYCLE_NONE;
 
                 if (rec == rec_not)
