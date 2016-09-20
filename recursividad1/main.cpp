@@ -42,7 +42,7 @@ uint8_t fr(char *p, uint8_t *counter, uint8_t rec)
 {
     uint8_t state = 0;
     uint8_t cycle = CYCLE_NONE;
-    uint8_t lval, r val;
+    uint8_t lval, rval;
     uint8_t counter_rec=0;
     uint8_t rcsvd = 0;
     char el;
