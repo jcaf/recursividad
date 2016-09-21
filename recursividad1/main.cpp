@@ -18,7 +18,7 @@ enum
 {
     NOT_BEGIN,
     NOT_TO_END,
-    NOT_END,
+    //NOT_END,
 };
 
 enum
@@ -52,7 +52,7 @@ uint8_t  logical(uint8_t lval, uint8_t op, uint8_t rval)
 //char exp[20]= {'n','(','n', 1, ')', eof};
 //char exp[20]= {'n','(','(', 'n', 1,')',')', eof};
 //char exp[20]= {'n','(','(', 'n','n',1,')',')', eof};
-char exp[20]= {'(','n','(','(','(', 'n','(', 'n',0,')',')',')',')',')', eof};
+//char exp[20]= {'(','n','(','(','(', 'n','(', 'n',0,')',')',')',')',')', eof};
 //char exp[20]= {'(','n',1,')', eof};
 //char exp[20]= {'(','n','(', 0,')',')', eof};
 //char exp[20]= {'(','n','n','(','n',0,')',')', eof};
@@ -63,7 +63,7 @@ char exp[20]= {'(','n','(','(','(', 'n','(', 'n',0,')',')',')',')',')', eof};
 //char exp[20]= {'n',0,'|','n',1, eof};
 //char exp[20]= {1,'&','n',0, eof};
 //char exp[20]= {'n',0,'&','(', 1 ,')', eof};
-//char exp[20]= {'n','(', 0 ,')' ,'&','(', 'n', '(',0, ')', '&', 1 ,')', eof};
+char exp[20]= {'n','(', 0,')','&','(', 'n', '(',0, ')', '&', 1,')', eof};
 
 uint8_t fr(const char *p, uint8_t *counter, uint8_t rec)
 {
@@ -82,7 +82,7 @@ uint8_t fr(const char *p, uint8_t *counter, uint8_t rec)
     {
         el = *p;
 
-        rcsvd = 0;//fix:
+        //rcsvd = 0;//fix:
 
         if (el == 'n')
         {
@@ -139,7 +139,7 @@ uint8_t fr(const char *p, uint8_t *counter, uint8_t rec)
         {
             (*counter)++;   //por su naturaleza, siempre regresa de una llamada recursiva
             break;          //originada por '(', osea, este *counter es el &counter_rec
-                            //pasado por la llamada anterior.
+            //pasado por la llamada anterior.
         }
         else if ((el=='&') || (el=='|'))
         {
@@ -154,9 +154,9 @@ uint8_t fr(const char *p, uint8_t *counter, uint8_t rec)
             else if (cycle == CYCLE_NONE)
             {
                 op = el;    //x defecto sera tomado como una operacion de 2 op
-                            //por ejmp, puede provenir de una expr. iniciando con NOT,
-                            //en donde el LVAL es el resultado del NOT, a continuacion, pasa
-                            //a ser el LVAL & y se transforma en un ciclo de 2 op.
+                //por ejmp, puede provenir de una expr. iniciando con NOT,
+                //en donde el LVAL es el resultado del NOT, a continuacion, pasa
+                //a ser el LVAL & y se transforma en un ciclo de 2 op.
                 cycle = CYCLE_2OP;
                 state_2OP = STATE_2OP_OPERATOR;
             }
@@ -188,19 +188,31 @@ uint8_t fr(const char *p, uint8_t *counter, uint8_t rec)
                 }
             }
         }
-        //////////////////////////////////////
-        if (rcsvd == 0)     //se suma el elemento actual(salvo '(' y ')' que tambien incrementan a *counter)
-            (*counter)++;   //"en linea", puesto que no ha regresado en esta pasada de una recursion,
-        //////////////////////////////////////
-        if (rcsvd == 0) //
-            p++;        //incrementa normalmente
-        else if (rcsvd == 1)
+        //        //////////////////////////////////////
+        //        if (rcsvd == 0)     //se suma el elemento actual(salvo '(' y ')' que tambien incrementan a *counter)
+        //            (*counter)++;   //"en linea", puesto que no ha regresado en esta pasada de una recursion,
+        //        //////////////////////////////////////
+        //        if (rcsvd == 0) //
+        //            p++;        //incrementa normalmente
+        //        else if (rcsvd == 1)
+        //            p = p + counter_rec;
+        //        //////////////////////////////////////
+        //        *counter = *counter + counter_rec;
+        //        counter_rec = 0;//fix:
+        //        //////////////////////////////////////
+        if (rcsvd == 0)
+        {
+            p++;
+            (*counter)++;
+        }
+        else//==1
+        {
             p = p + counter_rec;
-        //////////////////////////////////////
-        *counter = *counter + counter_rec;
-        counter_rec = 0;//fix:
-        //////////////////////////////////////
-
+            *counter = *counter + counter_rec;
+            //fix:
+            counter_rec = 0;//x cada pasada debe de limpiarse estas 2 variables
+            rcsvd = 0;
+        }
 
         //Ejecucion de las funciones de 1 op:NOT y de 2 op: AND, OR, etc ///////
         //no se usa nada de punteros, ya fueron deferenciados a su correspondientes lval / op / rval
@@ -210,34 +222,25 @@ uint8_t fr(const char *p, uint8_t *counter, uint8_t rec)
             {
                 lval = !lval;
 
-                state_NOT = NOT_END;
+                //---------------------
+                cycle = CYCLE_NONE;
+                state_NOT = 0;
+                if (rec == rec_not)
+                {
+                    rec = rec_none;
+                    break;
+                }
+                //---------------------
             }
         }
         else if (cycle == CYCLE_2OP)
         {
             if (state_2OP == STATE_2OP_RVAL)
             {
-                //ready to operate
                 lval = logical(lval, op, rval);
 
                 cycle = CYCLE_NONE;
                 state_2OP = STATE_2OP_NONE;
-            }
-        }
-
-
-        if (cycle == CYCLE_NOT)
-        {
-            if (state_NOT == NOT_END)
-            {
-                state_NOT = 0;
-                cycle = CYCLE_NONE;
-
-                if (rec == rec_not)
-                {
-                    rec = rec_none;
-                    break;
-                }
             }
         }
 
