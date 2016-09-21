@@ -46,21 +46,26 @@ uint8_t  logical(uint8_t lval, uint8_t op, uint8_t rval)
     return r;
 }
 
-
 //char exp[20]= {'n','n','n','n','n','n','n','n',1, eof};
-//unsigned
 //char exp[20]= {'n',1, eof};
-//unsigned
-//char exp[20]= {'n','n','n','n','n', 1, eof};
-
+//char exp[20]= {'n','n','n','n','n', 0, eof};
 //char exp[20]= {'n','(','n', 1, ')', eof};
 //char exp[20]= {'n','(','(', 'n', 1,')',')', eof};
 //char exp[20]= {'n','(','(', 'n','n',1,')',')', eof};
-//char exp[20]= {'(','n','(','(','(', 'n','(', 'n',1,')',')',')',')',')', eof};
+char exp[20]= {'(','n','(','(','(', 'n','(', 'n',0,')',')',')',')',')', eof};
 //char exp[20]= {'(','n',1,')', eof};
+//char exp[20]= {'(','n','(', 0,')',')', eof};
+//char exp[20]= {'(','n','n','(','n',0,')',')', eof};
+//char exp[20]= {'(','n','n','(','n',0,')',')', '&', 1, eof};
+//char exp[20]= {'(','n','n','(','n',1,')',')', '|', 'n', 1, eof};
+//char exp[20]= {1,'&',0, eof};
+//char exp[20]= {1,'&',0, '|', 1, '&', 0, eof};
+//char exp[20]= {'n',0,'|','n',1, eof};
+//char exp[20]= {1,'&','n',0, eof};
+//char exp[20]= {'n',0,'&','(', 1 ,')', eof};
+//char exp[20]= {'n','(', 0 ,')' ,'&','(', 'n', '(',0, ')', '&', 1 ,')', eof};
 
-char exp[20]= {1,'&',0, eof};
-uint8_t fr(char *p, uint8_t *counter, uint8_t rec)
+uint8_t fr(const char *p, uint8_t *counter, uint8_t rec)
 {
     char el;
     uint8_t cycle = CYCLE_NONE;
@@ -77,6 +82,8 @@ uint8_t fr(char *p, uint8_t *counter, uint8_t rec)
     {
         el = *p;
 
+        rcsvd = 0;//fix:
+
         if (el == 'n')
         {
             if (cycle == CYCLE_NONE)
@@ -84,11 +91,21 @@ uint8_t fr(char *p, uint8_t *counter, uint8_t rec)
                 cycle = CYCLE_NOT;
                 state_NOT = NOT_BEGIN;
             }
-            else
+            else if (cycle == CYCLE_NOT)
             {
                 rcsvd = 1;
                 lval = fr(p, &counter_rec, rec_not);
                 state_NOT = NOT_TO_END;
+            }
+            else if (cycle == CYCLE_2OP)
+            {
+                rcsvd = 1;
+
+                if (state_2OP == STATE_2OP_OPERATOR)
+                {
+                    rval = fr(p, &counter_rec, rec_not);
+                    state_2OP = STATE_2OP_RVAL;
+                }
             }
         }
         else if (el == '(')
@@ -102,7 +119,7 @@ uint8_t fr(char *p, uint8_t *counter, uint8_t rec)
 
             if (cycle == CYCLE_NONE)
             {
-                lval = _lval;
+                lval = _lval;//simplemente un seguidor del ultimo lval
             }
             else if (cycle == CYCLE_NOT)
             {
@@ -113,15 +130,16 @@ uint8_t fr(char *p, uint8_t *counter, uint8_t rec)
             {
                 if (state_2OP == STATE_2OP_OPERATOR)
                 {
-                    rval = lval;
+                    rval = _lval;
                     state_2OP = STATE_2OP_RVAL;
                 }
             }
         }
         else if (el == ')')
         {
-            (*counter)++;
-            break;//retorna del (
+            (*counter)++;   //por su naturaleza, siempre regresa de una llamada recursiva
+            break;          //originada por '(', osea, este *counter es el &counter_rec
+                            //pasado por la llamada anterior.
         }
         else if ((el=='&') || (el=='|'))
         {
@@ -133,6 +151,16 @@ uint8_t fr(char *p, uint8_t *counter, uint8_t rec)
                     state_2OP = STATE_2OP_OPERATOR;
                 }
             }
+            else if (cycle == CYCLE_NONE)
+            {
+                op = el;    //x defecto sera tomado como una operacion de 2 op
+                            //por ejmp, puede provenir de una expr. iniciando con NOT,
+                            //en donde el LVAL es el resultado del NOT, a continuacion, pasa
+                            //a ser el LVAL & y se transforma en un ciclo de 2 op.
+                cycle = CYCLE_2OP;
+                state_2OP = STATE_2OP_OPERATOR;
+            }
+            //ojo: NOT es un cyclo que no incluye en su parsing "Operadores logicos"
         }
         else //operandos
         {
@@ -161,21 +189,21 @@ uint8_t fr(char *p, uint8_t *counter, uint8_t rec)
             }
         }
         //////////////////////////////////////
-        if (rcsvd == 0)
-            (*counter)++;
-
-        ///////////////////////////////////////
-        if (cycle == CYCLE_2OP)
-        {
-            if (state_2OP == STATE_2OP_RVAL)
-            {
-                //ready to operate
-                lval = logical(lval, op, rval);
-            }
-        }
-        ///////////////////////////////////////
-
+        if (rcsvd == 0)     //se suma el elemento actual(salvo '(' y ')' que tambien incrementan a *counter)
+            (*counter)++;   //"en linea", puesto que no ha regresado en esta pasada de una recursion,
         //////////////////////////////////////
+        if (rcsvd == 0) //
+            p++;        //incrementa normalmente
+        else if (rcsvd == 1)
+            p = p + counter_rec;
+        //////////////////////////////////////
+        *counter = *counter + counter_rec;
+        counter_rec = 0;//fix:
+        //////////////////////////////////////
+
+
+        //Ejecucion de las funciones de 1 op:NOT y de 2 op: AND, OR, etc ///////
+        //no se usa nada de punteros, ya fueron deferenciados a su correspondientes lval / op / rval
         if (cycle == CYCLE_NOT)
         {
             if (state_NOT == NOT_TO_END)
@@ -185,22 +213,22 @@ uint8_t fr(char *p, uint8_t *counter, uint8_t rec)
                 state_NOT = NOT_END;
             }
         }
-
-        //////////////////////////////////////
-
-        if (rcsvd == 0)//
-            p++;//incrementa normalmente
-        else if (rcsvd == 1)
-            p = p + counter_rec;
-        //////////////////////////////////////
-
-        *counter = *counter + counter_rec;
-
-        ///////////////////////////////
-
-        if (rec > rec_none)
+        else if (cycle == CYCLE_2OP)
         {
-            if ((cycle == CYCLE_NOT) && (state_NOT == NOT_END))
+            if (state_2OP == STATE_2OP_RVAL)
+            {
+                //ready to operate
+                lval = logical(lval, op, rval);
+
+                cycle = CYCLE_NONE;
+                state_2OP = STATE_2OP_NONE;
+            }
+        }
+
+
+        if (cycle == CYCLE_NOT)
+        {
+            if (state_NOT == NOT_END)
             {
                 state_NOT = 0;
                 cycle = CYCLE_NONE;
@@ -211,11 +239,11 @@ uint8_t fr(char *p, uint8_t *counter, uint8_t rec)
                     break;
                 }
             }
-            //else if (rec == rec_parenth)
         }
 
     }//end while
-    printf("lval es: %u\n", lval);
+
+    //printf("lval es: %u\n", lval);
     return lval;
 }
 
