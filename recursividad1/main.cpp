@@ -1,3 +1,9 @@
+/*
+OPERATOR - OPERAND
+NOT - OPERAND
+
+
+*/
 #include <iostream>
 #include <iostream>
 #include <stdio.h>
@@ -19,6 +25,10 @@ enum
     NOT_BEGIN,
     NOT_TO_END,
     //NOT_END,
+
+    STATE_NOT_NONE,
+    STATE_NOT_FOUND,
+    STATE_NOT_OPERAND,
 };
 
 enum
@@ -61,9 +71,9 @@ uint8_t  logical(uint8_t lval, uint8_t op, uint8_t rval)
 //char exp[20]= {1,'&',0, eof};
 //char exp[20]= {1,'&',0, '|', 1, '&', 0, eof};
 //char exp[20]= {'n',0,'|','n',1, eof};
-//char exp[20]= {1,'&','n',0, eof};
+char exp[20]= {1,'&','n',0, eof};
 //char exp[20]= {'n',0,'&','(', 1 ,')', eof};
-char exp[20]= {'n','(', 0,')','&','(', 'n', '(',0, ')', '&', 1,')', eof};
+//char exp[20]= {'n','(', 0,')','&','(', 'n', '(',0, ')', '&', 1,')', eof};
 
 uint8_t fr(const char *p, uint8_t *counter, uint8_t rec)
 {
@@ -81,8 +91,6 @@ uint8_t fr(const char *p, uint8_t *counter, uint8_t rec)
     while (*p != eof)
     {
         el = *p;
-
-        //rcsvd = 0;//fix:
 
         if (el == 'n')
         {
@@ -190,10 +198,10 @@ uint8_t fr(const char *p, uint8_t *counter, uint8_t rec)
         }
         //        //////////////////////////////////////
         //        if (rcsvd == 0)     //se suma el elemento actual(salvo '(' y ')' que tambien incrementan a *counter)
-        //            (*counter)++;   //"en linea", puesto que no ha regresado en esta pasada de una recursion,
+        //            (*counter)++;
         //        //////////////////////////////////////
         //        if (rcsvd == 0) //
-        //            p++;        //incrementa normalmente
+        //            p++;
         //        else if (rcsvd == 1)
         //            p = p + counter_rec;
         //        //////////////////////////////////////
@@ -202,8 +210,9 @@ uint8_t fr(const char *p, uint8_t *counter, uint8_t rec)
         //        //////////////////////////////////////
         if (rcsvd == 0)
         {
-            p++;
-            (*counter)++;
+            p++;            //incrementa normalmente
+            (*counter)++;   //se suma el elemento actual(salvo '(' y ')' que tambien incrementan a *counter)
+                            //"en linea", puesto que no ha regresado en esta pasada de una recursion,
         }
         else//==1
         {
